@@ -8,7 +8,14 @@ This script requires use of an OpenAI API key and the OpenAI Python client/libra
 ```bash
 pip install openai
 ```
-Read the openai-python docs for more info and details on how to set your OpenAI API Key https://github.com/openai/openai-python
+Make sure you have an OpenAI API key environment variable set, you can set for this one shell session with:
+```
+export OPENAI_API_KEY=[your_key_here]
+```
+Before calling the script. 
+### RECOMMENDED
+You can add that export line into your .bashrc or .zshrc or whatever shell initialization file to have a persistent use key on the machine.
+For more information go and read the openai-python docs for more info and details on how to set your OpenAI API Key https://github.com/openai/openai-python
 # Basic use
 Simply run
 ```bash
@@ -18,23 +25,33 @@ To begin a new conversation with GPT4o-mini, the default model. The default syst
 
 To end the operation, you can use CTRL+C to send a user interrupt, or you can simply type 'exit' or 'quit'
 
-# other functionality
-## Invoke with initial message
+# Other functionality
+## use these command line arguments for other functionality
+### Invoke with initial message
 You can open your conversation with your first message in single quotes like this:
 ```bash
 python3 chatwgpt.py 'How do I delete a folder and all of its contents?'
 ```
-## Change system message
+### Change system message
 If you would rather chat about something other than linux, you can change between built-in system messages (viewable at the top of the python script) with ```-p [promptname]``` or ```--prompt [promptname]```   
 As of right now there is no way to call with a custom system message. Feel free to change the system message in the chatwgpt.py file, or add your own multitude of custom prompts
-## Change model
+### Change model
 You can choose a different openAI GPT model to call with ```-m [modelname]``` or ```--model [modelname]```
-## Stream responses
+### Stream responses (currently broken)
 You can activate (currently broken) streaming with ```-s True``` or ```--stream True```
-## Call a local LLM compatible with OpenAI API calls
+### Call a local LLM compatible with OpenAI API calls
 You can call a locally available llm running on 127.0.0.1:5000 (such as Oobabooga/text-generation-webui) with ```-t ooba``` or ```--target ooba```
-## send a txt file
+### send a txt file
 You can simply call ```python3 chatwgpt.py textfile.txt``` to send the entire contents of a text file to the model. Input is sanitized but unfortunately sends much of your message as HTML at the moment as that is all I could figure out. 
+### See the help message
+Call ```python3 chatwgpt.py -h``` or ```python3 chatwgpt.py --help``` to view various usage information
+### Single use API key
+When called without any arguments and no OPENAI_API_KEY environment variable, you will be given the opportunity to input the API key directly into the terminal for this session only. This is not recommended and was only included for testing
+## Make calling easier with an alias
+If you like having your concise linux copilot and want it to be even easier to use, open your .bashrc or .zshrc file and add the following line
+```
+alias chatwgpt='python3 /home/tatersbarn/chatgpt.py'
+```
 # Conclusions and where to go next
 This is a really helpful little tool of mine and I really enjoy the quick ability to ask about a command or pipeline of commands to do a job in a bash shell. I think anyone who uses linux could benefit from it, and you should totally try it if you keep forgetting how to ```chmod +x yourfile.xyz```
 
