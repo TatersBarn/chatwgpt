@@ -1,8 +1,12 @@
 # chatwgpt
 Command Line Access to LLMs compatible with OpenAI's API
-Note: This project is primarily intended for me to be able to ask GPT models quick questions about linux operation, bash commands, etc.
+Note: This project is primarily intended for me to be able to ask GPT models quick questions about linux operation, bash commands, etc. But you can easily just use it to chat with OpenAI models. (Use of the OpenAI API is not free, and having a ChatGPT Premium subscription does not count. The API is charged pay-as-you-go by token use. For many it costs less than ChatGPT Premium
+
 # Considerations
-This is unfinished and independently produced software written by an amateur programmer, use at your own risk.
+-This is unfinished and independently produced software written by an amateur programmer, use at your own risk.
+-This solution currently only interacts with the chat completions endpoint.
+-This solution has been updated to the v1 sdk, but i very well may forget to update it further.
+
 # Installation
 This script requires use of an OpenAI API key and the OpenAI Python client/library, so install it with
 ```bash
@@ -12,7 +16,8 @@ Make sure you have an OpenAI API key environment variable set, you can set for t
 ```
 export OPENAI_API_KEY=[your_key_here]
 ```
-Before calling the script. 
+Before calling the script.
+
 ### RECOMMENDED
 You can add that export line into your .bashrc or .zshrc or whatever shell initialization file to have a persistent use key on the machine.
 For more information go and read the openai-python docs for more info and details on how to set your OpenAI API Key https://github.com/openai/openai-python
@@ -47,11 +52,13 @@ You can simply call ```python3 chatwgpt.py textfile.txt``` to send the entire co
 Call ```python3 chatwgpt.py -h``` or ```python3 chatwgpt.py --help``` to view various usage information
 ### Single use API key
 When called without any arguments and no OPENAI_API_KEY environment variable, you will be given the opportunity to input the API key directly into the terminal for this session only. This is not recommended and was only included for testing
+
 ## Make calling easier with an alias
 If you like having your concise linux copilot and want it to be even easier to use, open your .bashrc or .zshrc file and add the following line
 ```
 alias chatwgpt='python3 /home/tatersbarn/chatgpt.py'
 ```
+
 # Conclusions and where to go next
 This is a really helpful little tool of mine and I really enjoy the quick ability to ask about a command or pipeline of commands to do a job in a bash shell. I think anyone who uses linux could benefit from it, and you should totally try it if you keep forgetting how to ```chmod +x yourfile.xyz```
 
