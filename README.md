@@ -31,6 +31,13 @@ To begin a new conversation with GPT4o-mini, the default model. The default syst
 To end the operation, you can use CTRL+C to send a user interrupt, or you can simply type 'exit' or 'quit'
 
 # Other functionality
+## Easy settings changes during runtime
+Upon execution settings are taken from taterchat.conf, these settings never get overwritten so you can always reuse the defaults here if you like but if you want you can also use the slash commands:
+```
+/m or /model   will give you model choices from oobabooga or openai
+/t or /target   will allow you to change the target api
+/p or /prompt    will allow you to choose from built in prompts or custom ones you add to oobafunctions.py
+```
 ## use these command line arguments for other functionality
 ### Invoke with initial message
 You can open your conversation with your first message in single quotes like this:
