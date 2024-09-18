@@ -6,21 +6,40 @@ import argparse
 import re
 import readline
 import threading
+import asyncio
+import subprocess
 import time
-import curses
+import importlib
 
-prompts = {
-	"concisepilot": "You are a quick problem solving assistant for navigating and operating in linux. Give short, concise responses that help the user with any questions or problems they ask about when using linux.",
-	"gptlike": "You are an ai chatbot and general purpose assistant being used by a creative and inquisitive person who likes to explore the potentials of their computer use. Please listen to the users requests and go over it thoughtfully, creating an ouline of the request or its challenges on a whiteboard in my your mind, ensuring you consider all angles, potentials, and alternatives when making your response. In your response, first address the problem or question by offering a solution or answer that is direct and concise, before going into more detail about how that first answer works, and then offering at least one alternative. Finally, give the user some considerations for the future-proofing of any solutions provided, including security and stability concerns for questions about programming or linux config. Then continue the conversation with the user, helping them to build their solutions and ideas by asking questions of your own and offering various suggestions that can keep the user building and growing."
-}
+import OobaFunctions
+
+importlib.reload(OobaFunctions)
+
+#script_dir = os.getcwd()
+script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+config = {}
+
+# Default Configuration (modify taterchat.conf to change these easily)
+default_voutput_dir = f"{script_dir}/outputs"
+default_vmodels_dir = f"{script_dir}/models"
+#default_voice_model = "en_US-kristin-medium.onnx"
+default_speaker = 0
+default_target = "openai"
+default_model_choice = "gpt-4o-mini"
+default_prompt_choice = "concisepilot"
+#default_voice_bool = True
+default_oneout = False
+
+prompts = OobaFunctions.prompts
 
 def str2bool(v):
-    if v.lower() in ('yes', 'true', 't', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', '0'):
-        return False
-    else:
-        return v.lower()
+	if v.lower() in ('yes', 'true', 't', '1'):
+		return True
+	elif v.lower() in ('no', 'false', 'f', '0'):
+		return False
+	else:
+		return v.lower()
 
 # Configure api credentials from environment variable or tell user to set one up
 def check_openai_api_key():
@@ -37,47 +56,102 @@ def check_openai_api_key():
 			# Here you can proceed to use the input API key, e.g., setting the environment variable
 			print(f"API key set: {api_key}")
 		else:
-			print(f"Exiting...")
-			sys.exit(1)  # Exit the program as the API key is required
+			print(f"continuing without API key")
+			api_key = ""
 		return api_key
 
 parser = argparse.ArgumentParser(description='Chat with ChatGPT or other LLMS with various parameters')
-parser.add_argument('-t', '--target', type=str, help='Target for api request choices: openai OR ooba (Default openai)', default='openai')
-parser.add_argument('-m', '--model', type=str, help='OpenAI model choices: gpt-4o-mini OR gpt-4o OR gpt-3.5-turbo (Default gpt-4o-mini', default='gpt-4o-mini')
+parser.add_argument('-t', '--target', type=str, help='Target for api request choices: openai OR ooba (Default openai)')
+parser.add_argument('-m', '--model', type=str, help='OpenAI model choices: gpt-4o-mini OR gpt-4o OR gpt-3.5-turbo (Default gpt-4o-mini')
 parser.add_argument('message', type=str, nargs='?', default='', help='User Message to begin conversation with LLM')
-parser.add_argument('-p', '--prompt', type=str, help='Prompt style choice: concisepilot, gptlike (Default concisepilot)', default='concisepilot')
+parser.add_argument('-p', '--prompt', type=str, help='Prompt style choice: concisepilot, gptlike (Default concisechat)')
+
+# One Output Mode for debugging
+parser.add_argument('-o', '--oneout', type=str2bool, help='One output mode - True to break after one response')
+
+# Voice output, defaults to false here as piper-tts config is not ready for release
+#parser.add_argument('-v', '--voice', type=str2bool, help='Toggle "True" for Voice Output using Piper')
+
+# CURRENTLY BROKEN streaming output
 parser.add_argument('-s', '--stream', type=str2bool, help='[NOT YET IMPLEMENTED Output and conversationhistory are broken when Streaming is True!] Streaming True or False or t or f or 1 or 0 (Default False)', default=False)
 
 args = parser.parse_args()
 
-if args.target not in ['openai','ooba']:
-	print(f"ERROR: no interface named {args.target}")
-	sys.exit(1)
-elif args.target == 'ooba':
-	aliasorkey = "..."
-	apibaseurl = "http://127.0.0.1:5000/v1/"
-	modelChoice = "oobastank"
-elif args.target == 'openai':
-	aliasorkey = check_openai_api_key()
-	apibaseurl = openai.base_url
+target = default_target
+model_choice = default_model_choice
+prompt_choice = default_prompt_choice
+#voice_model = default_voice_model
+speaker = default_speaker
+oneout = False
+#voice = True
+output_dir = default_voutput_dir
+models_dir = default_vmodels_dir
 
-if args.model not in ['gpt-4o-mini','gpt-4o','gpt-3.5-turbo']:
-	print(f"ERROR: no model named {args.model}")
-	sys.exit(1)
-else:
-	modelChoice = args.model
+targets = ['openai','ooba']
+models = ['gpt-4o-mini','gpt-4o','gpt-3.5-turbo', 'oobastank']
+#voice_models = [
+#	'en_US-kristin-medium.onnx',
+#	'en_GB-semaine-medium.onnx',
+#	'en_US-l2arctic-medium.onnx',
+#	'en_US-lessac-medium.onnx',
+#	'en_US-libritts-high.onnx',
+#	'en_US-libritts_r-medium.onnx',
+#	'Twilight.pth'
+#]
+#multivoice_models = [
+#	'en_GB-semaine-medium.onnx',
+#	'en_US-l2arctic-medium.onnx',
+#	'en_US-libritts-high.onnx',
+#	'en_US-libritts_r-medium.onnx'
+#]
+sysmsgs = OobaFunctions.prompts
 
-if args.prompt not in ['concisepilot','gptlike']:
-	print(f"ERROR: no built in prompt named {args.prompt}")
-	sys.exit(1)
-else:
-	promptChoice = args.prompt
 
-if args.stream not in [True, False]:
-	print(f"ERROR: STREAM must be True or False (or t,f,1,0)  not {args.stream}")
-	sys.exit(1)
-else:
-	streaming = args.stream
+with open(f"{script_dir}/taterchat.conf", 'r') as f:
+	for line in f:
+		line = line.strip()
+		if line.startswith('#') or not line:  # Ignore comment lines and empty lines
+			continue
+		key, value = line.split('=', 1)
+		value = value.strip()  # Remove any whitespace around the value
+
+		if key == 'target':
+			if value in targets:
+				target = value
+			else:
+				print(f"Warning: invalid target in config '{value}'. Using default: {default_target}")
+
+		elif key == 'model_choice' and args.model not in models:
+			if value in models:
+				model_choice = value
+			else:
+				print(f"Warning: Invalid model in config '{value}'. Using default: {default_model_choice}.")
+
+		elif key == 'prompt':
+			if value in sysmsgs.keys():
+				prompt_choice = value
+			else:
+				print(f"Warning: Invalid prompt in config '{value}'. Using default: {default_prompt_choice}.")
+
+#		elif key == 'voice_model':
+#			if value in voice_models:
+#				voice_model = value
+#			else:
+#				print(f"Warning: Invalid voice_model in config '{value}'. Using default: {default_voice_model}.")
+
+		elif key == 'speaker':
+			if not (isinstance(int(value), int) and int(value) > -5):
+				print(f"Warning: Invalid speaker '{value}'. Using default: {default_speaker}.")
+				speaker = default_speaker
+			else:
+				speaker = int(value)
+
+		elif key == 'oneout':
+			oneout = str2bool(value)
+
+#		elif key == 'voice':
+#			voice =str2bool(value)
+
 
 # Define color codes
 class Colors:
@@ -96,7 +170,31 @@ loading_event = threading.Event()
 # list of acceptable affirmatives for api input question
 affirmatives = ["y", "yes", "ye", "yeah", "yeppers"]
 
-client = OpenAI(api_key=aliasorkey,base_url=apibaseurl)
+client = OpenAI(api_key=check_openai_api_key, base_url=openai.base_url)
+
+def resolveTarget():
+	global target
+	global aliasorkey
+	global model_choice
+	global client
+	global prompt_choice
+
+	if target == "openai":
+		aliasorkey = check_openai_api_key()
+		apibaseurl = openai.base_url
+		model_choice = "gpt-4o-mini"
+		prompt_choice = "concisepilot"
+	if target == "ooba":
+		aliasorkey = "..."
+		apibaseurl = "http://127.0.0.1:5000/v1/"
+		model_choice = "oobastank"
+		prompt_choice = "oobafree"
+
+	client = OpenAI(api_key=aliasorkey, base_url=apibaseurl)
+
+resolveTarget()
+
+
 
 def configure_readline():
 	# Enable readline history and multi-line editing
@@ -134,6 +232,10 @@ def show_loading():
 	print("\r" + " " * 40, end="")
 
 def chat_with_gpt4(prompt, history=[]):
+#	global voice_model
+#	global voice_models
+#	global multivoice_models
+	global model_choice
 	# Add the user's input to the history
 	history.append({"role": "user", "content": prompt})
 
@@ -146,30 +248,49 @@ def chat_with_gpt4(prompt, history=[]):
 	try:
 		# Send the conversation history to GPT-4 and get a response
 		response = client.chat.completions.create(
-			model=modelChoice,
+			model=model_choice,
 			messages=history,
-			stream=streaming,
 		)
 
 		assistant_reply = ""
 
-		if streaming:
-			for chunk in response:
-				if chunk.choices[0].delta.content is not None:
-					print(chunk.choices[0].delta.content, end = " ")
-					assistant_reply += chunk.choices[0].delta.content
-		else:
-			# Extract the assistant's reply
-			assistant_reply = response.choices[0].message.content
-			history.append({"role": "assistant", "content": assistant_reply})
+		# Extract the assistant's reply
+		assistant_reply = response.choices[0].message.content
+
+		readable_reply = sanitize_input(assistant_reply).replace('*','')
+
+		history.append({"role": "assistant", "content": assistant_reply})
 	finally:
 		# Ensure the loading animation is stopped
 		loading_event.set()
 		loading_thread.join()  # Wait for the loading thread to finish
 
+
+
+#	Voice Output with PiperTTS - requires directories models and outputs alongside chatwgpt, not implemented in public release
+#		with open(f"{output_dir}/tmp.txt", "w") as f:
+#			f.write(readable_reply)
+
+#		if voice_model in multivoice_models:
+#			command = ["bash", "-c", f"cat {output_dir}/tmp.txt | piper -m {models_dir}/{voice_model} -s {speaker} -f {output_dir}/tmp.wav"
+#		]
+#		else:
+#			command = ["bash", "-c", f"cat {output_dir}/tmp.txt | piper -m {models_dir}/{voice_model} -f {output_dir}/tmp.wav"
+#		]
+
+#		if voice_model in multivoice_models:
+#			print(f"\r{voice_model} in multivoice")
+#		else:
+#			print(f"\r{voice_model} not in multivoice")
+
+#		command = ["bash", "-c", f"cat {output_dir}/tmp.txt | piper -m {models_dir}/{voice_model} -s {speaker} -f {output_dir}/tmp.wav"
+#		]
+#		print(f"\rGenerating Audio Samples")
+#		subprocess.run(command)
+
 	return assistant_reply, history
 
-def multi_line_input(end_delimiters=["```", "~~~"]):
+def multi_line_input(end_delimiters=["```","'''", "~~~"]):
 	
 	# Captures input and handles multi-line blocks with delimiters. Sends immediately outside blocks.
 	
@@ -233,8 +354,37 @@ def sanitize_input(user_input):
 
 	return sanitized
 
+def printDebug():
+	global target
+	global model_choice
+	global prompt_choice
+#	global voice
+#	global voice_model
+	global speaker
+	global oneout
+	global script_dir
+	global model_dir
+	global output_dir
+	teststr = "testprint"
+
+	# Debug
+	print(f"Target = {target}")
+	print(f"Model = {model_choice}")
+	print(f"System Message = {prompt_choice}")
+#	print(f"Voice = {voice}")
+#	print(f"Voice Model = {voice_model}")
+	print(f"Speaker = {speaker}")
+	print(f"Oneout = {oneout}")
+	print(f"script_dir = {script_dir}")
+	print(f"models_dir = {models_dir}")
+	print(f"output_dir = {output_dir}")
 
 def main():
+	printDebug()
+	global target
+	global prompts
+	global prompt_choice
+	global model_choice
 	# Configure readline for better terminal handling
 	configure_readline()
 
@@ -249,7 +399,7 @@ def main():
 	history = []
 
 	# Add system message to history
-	history.append({"role": "system", "content": prompts[promptChoice]})
+	history.append({"role": "system", "content": prompts[prompt_choice]})
 
 	# Begin taking input from args or user and loop
 	while True:
@@ -277,16 +427,72 @@ def main():
 
 			if msg2gpt.lower() in ["exit", "quit"]:
 				break
+
+			elif msg2gpt.lower() in ['/t', '/target']:
+				for index, tg in enumerate(targets):
+					print(f"{index}: {tg}")
+				target_choice = input("Which target? (index):")
+				if int(target_choice) in [0,1]:
+					target = targets[int(target_choice)]
+					print(f"Target successfully changed")
+					resolveTarget()
+					printDebug()
+					continue
+				else:
+					printDebug()
+					print("ERROR: invalid input continuing with")
+					continue
+
+#			elif msg2gpt.lower() in ["/v", "/voice"]:
+#				OobaFunctions.setMultiVoiceModel()
+#				continue
+
+			elif msg2gpt.lower() in ["/p","/sysmsg"]:
+				pq = OobaFunctions.setSystemMessage()
+				if pq in sysmsgs.keys():
+					prompt_choice = pq
+					history = []
+					history.append({"role": "system", "content": prompts[prompt_choice]})
+				else:
+					print(f"something went wrong before return to main")
+				printDebug()
+				print(f"Starting new conversation with above parameters")
+				continue
+
+			elif msg2gpt.lower() in ["/m", "/model"]:
+				mq = OobaFunctions.loadModel(target)
+				
+				if mq is not None:  # Check if the result is a model name
+					model_choice = mq
+					print(f"Model selected: {model_choice}")
+				elif mq is None:  # Handle case where loadModel returns None
+					print("Failed to load model.")
+				else:
+					print("Unexpected result from loadModel.")
+				
+				printDebug()  # Ensure this function is defined and used as needed
+				print("Conversation continuing with above parameters")
+				continue
+
+			elif msg2gpt.lower() in ["/k", "/keep"]:
+				OobaFunctions.setSaveFiles(teststr)
+				continue
+
 			elif msg2gpt.lower() in ["help", "?"]:
 				show_help()
 				continue
 
 			# Pass to the model
 			reply, history = chat_with_gpt4(msg2gpt, history)
-			if streaming is not True:
-				print(f"\n{Colors.ERROR}{modelChoice}:{Colors.ENDC}\n {reply}\n")
-			else:
-				print(f"\n")
+			print(f"\n{Colors.ERROR}{model_choice}:{Colors.ENDC}\n {reply}\n")
+
+			# Play that wav file if voice = True
+#			if voice:
+#				with open(os.devnull, 'w') as devnull:
+#					vresult = subprocess.Popen(['aplay', f"{output_dir}/tmp.wav"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#					voutput, verrors = vresult.communicate()
+#			if oneout:
+#				break
 		
 		except KeyboardInterrupt:
 			print("\nInterrupted by user.")
